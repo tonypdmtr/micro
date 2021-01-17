@@ -14,7 +14,16 @@ import (
 	"github.com/zyedidia/micro/v2/internal/shell"
 	"github.com/zyedidia/micro/v2/internal/util"
 	"github.com/zyedidia/tcell/v2"
+
+          "os"
+          "os/exec"
 )
+
+func cls() {
+    cmd := exec.Command("cmd", "/c", "cls")
+    cmd.Stdout = os.Stdout
+    cmd.Run()
+}
 
 // ScrollUp is not an action
 func (h *BufPane) ScrollUp(n int) {
@@ -1462,6 +1471,7 @@ func (h *BufPane) Quit() bool {
 		} else {
 			screen.Screen.Fini()
 			InfoBar.Close()
+                              cls()
 			runtime.Goexit()
 		}
 	}
@@ -1504,6 +1514,7 @@ func (h *BufPane) QuitAll() bool {
 		}
 		screen.Screen.Fini()
 		InfoBar.Close()
+                    cls()
 		runtime.Goexit()
 	}
 
