@@ -14,7 +14,6 @@ import (
 	"github.com/zyedidia/micro/v2/internal/shell"
 	"github.com/zyedidia/micro/v2/internal/util"
 	"github.com/zyedidia/tcell/v2"
-
           "os"
           "os/exec"
 )
@@ -856,21 +855,24 @@ func (h *BufPane) find(useRegex bool) bool {
 	if useRegex {
 		prompt = "Find (regex): "
 	}
-	InfoBar.Prompt(prompt, "", "Find", func(resp string) {
-		// Event callback
-		match, found, _ := h.Buf.FindNext(resp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true, useRegex)
-		if found {
-			h.Cursor.SetSelectionStart(match[0])
-			h.Cursor.SetSelectionEnd(match[1])
-			h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]
-			h.Cursor.OrigSelection[1] = h.Cursor.CurSelection[1]
-			h.Cursor.GotoLoc(match[1])
-		} else {
-			h.Cursor.GotoLoc(h.searchOrig)
-			h.Cursor.ResetSelection()
+	var eventCallback func(resp string)
+	if h.Buf.Settings["incsearch"].(bool) {
+		eventCallback = func(resp string) {
+			match, found, _ := h.Buf.FindNext(resp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true, useRegex)
+			if found {
+				h.Cursor.SetSelectionStart(match[0])
+				h.Cursor.SetSelectionEnd(match[1])
+				h.Cursor.OrigSelection[0] = h.Cursor.CurSelection[0]
+				h.Cursor.OrigSelection[1] = h.Cursor.CurSelection[1]
+				h.Cursor.GotoLoc(match[1])
+			} else {
+				h.Cursor.GotoLoc(h.searchOrig)
+				h.Cursor.ResetSelection()
+			}
+			h.Relocate()
 		}
-		h.Relocate()
-	}, func(resp string, canceled bool) {
+	}
+	InfoBar.Prompt(prompt, "", "Find", eventCallback, func(resp string, canceled bool) {
 		// Finished callback
 		if !canceled {
 			match, found, err := h.Buf.FindNext(resp, h.Buf.Start(), h.Buf.End(), h.searchOrig, true, useRegex)
@@ -1460,40 +1462,44 @@ func (h *BufPane) ClearInfo() bool {
 	return true
 }
 
+// ForceQuit closes the current tab or view even if there are unsaved changes
+// (no prompt)
+func (h *BufPane) ForceQuit() bool {
+	h.Buf.Close()
+	if len(MainTab().Panes) > 1 {
+		h.Unsplit()
+	} else if len(Tabs.List) > 1 {
+		Tabs.RemoveTab(h.splitID)
+	} else {
+		screen.Screen.Fini()
+		InfoBar.Close()
+                    cls()
+		runtime.Goexit()
+	}
+	return true
+}
+
 // Quit this will close the current tab or view that is open
 func (h *BufPane) Quit() bool {
-	quit := func() {
-		h.Buf.Close()
-		if len(MainTab().Panes) > 1 {
-			h.Unsplit()
-		} else if len(Tabs.List) > 1 {
-			Tabs.RemoveTab(h.splitID)
-		} else {
-			screen.Screen.Fini()
-			InfoBar.Close()
-                              cls()
-			runtime.Goexit()
-		}
-	}
 	if h.Buf.Modified() {
 		if config.GlobalSettings["autosave"].(float64) > 0 {
 			// autosave on means we automatically save when quitting
 			h.SaveCB("Quit", func() {
-				quit()
+				h.ForceQuit()
 			})
 		} else {
 			InfoBar.YNPrompt("Save changes to "+h.Buf.GetName()+" before closing? (y,n,esc)", func(yes, canceled bool) {
 				if !canceled && !yes {
-					quit()
+					h.ForceQuit()
 				} else if !canceled && yes {
 					h.SaveCB("Quit", func() {
-						quit()
+						h.ForceQuit()
 					})
 				}
 			})
 		}
 	} else {
-		quit()
+		h.ForceQuit()
 	}
 	return true
 }
