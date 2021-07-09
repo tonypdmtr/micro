@@ -265,7 +265,7 @@ var defaultCommonSettings = map[string]interface{}{
 	"cursorline":     true,
 	"diffgutter":     false,
 	"encoding":       "utf-8",
-	"eofnewline":     true,
+	"eofnewline":     false,
 	"fastdirty":      false,
 	"fileformat":     "unix",
 	"filetype":       "unknown",
